@@ -11,7 +11,11 @@ const CircleGrid = () => {
   const navCircleIds = ["about", "web-dev", "process", "contact"];
 
   // Responsive Grid Layout
-  const [windowSize, setWindowSize] = useState({ width: 1200, height: 800 });
+  // Responsive Grid Layout
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -25,82 +29,157 @@ const CircleGrid = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { cols, circleSize } = useMemo(() => {
-    const totalCircles = 24; // Hardcoded count from circleData
+  const { cols, circleSize, verticalGap, horizontalGap, wrapperPadding } = useMemo(() => {
+    const totalCircles = 24;
 
-    // Desktop: Keep original fixed layout logic BUT respect height constraints
+    // --- Desktop Layout (Fixed constraints) ---
     if (windowSize.width >= 1024) {
       const targetCols = 6;
-      const rows = 4; // ceil(24/6)
+      const rows = 4;
       const gap = 15;
       const padding = 20;
-      const safetyBuffer = 60; // Increased to 60px to ensure fit at 100% zoom with browser UI
+      const safetyBuffer = 60;
 
-      // Width Constraint
       const availableWidth = Math.min(windowSize.width, 1400) - (padding * 2);
       const sizeByWidth = (availableWidth / targetCols) - gap;
 
-      // Height Constraint
-      // Hex packing height approx: size * (1 + (rows - 1) * 0.85)
       const heightFactor = 0.85;
       const availableHeight = windowSize.height - (padding * 2) - safetyBuffer;
       const sizeByHeight = availableHeight / (1 + (rows - 1) * heightFactor);
 
       let size = Math.min(sizeByWidth, sizeByHeight);
-
-      // Clamp: Min 50 allows shrinking for short screens
-      // Max 130 reduced from 140 to ensure it doesn't look too crowded or overflow
       size = Math.min(Math.max(size, 50), 130);
 
-      return { cols: targetCols, circleSize: size };
+      return {
+        cols: targetCols,
+        circleSize: size,
+        verticalGap: -(size * 0.25), // Standard overlap for desktop
+        horizontalGap: size * 0.2, // Standard gap
+        wrapperPadding: 20
+      };
     }
 
-    // Mobile/Tablet: Dynamic packing to fit ALL circles in viewport
-    const aspectRatio = windowSize.width / windowSize.height;
+    // --- Mobile/Tablet Dense Layout ---
+    // Goal: Fully cover the screen with NO empty space.
 
-    // Estimate best column count based on aspect ratio
-    // Formula attempts to make a grid with similar aspect ratio to screen
-    let targetCols = Math.round(Math.sqrt(totalCircles * aspectRatio));
+    // 1. Determine optimal grid shape (Cols x Rows)
+    // We want the grid's aspect ratio to match the screen's AR as closely as possible.
+    // Factors of 24: 1x24, 2x12, 3x8, 4x6, 6x4...
+    const screenAR = windowSize.width / windowSize.height;
+    const padding = windowSize.width < 480 ? 5 : 10; // Minimal padding on mobile
 
-    // Clamp columns to reasonable bounds for mobile
-    if (windowSize.width < 480) {
-      // Force fewer columns on very narrow screens unless landscape
-      targetCols = Math.max(2, Math.min(targetCols, 4));
+    const validConfigs = [
+      { c: 3, r: 8 },
+      { c: 4, r: 6 },
+      { c: 5, r: 5 }, // Approx for 24 (one empty or filled) - let's stick to exact factors for now or ceil
+      { c: 6, r: 4 }
+    ];
+
+    // Find config that yields the largest circles while fitting within aspect ratio
+    // Ideally, we want the one where (TotalWidth / TotalHeight) ~ ScreenAR
+    // Width ~ c, Height ~ r. So look for c/r closest to screenAR.
+    let bestConfig = validConfigs[0];
+
+    // Explicit override for standard mobile portrait width
+    if (windowSize.width < 550) {
+      bestConfig = { c: 3, r: 8 };
     } else {
-      targetCols = Math.max(3, Math.min(targetCols, 7));
+      let minDiff = Number.MAX_VALUE;
+
+      for (const config of validConfigs) {
+        const configAR = config.c / config.r; // Rough grid AR
+        const diff = Math.abs(configAR - screenAR);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestConfig = config;
+        }
+      }
     }
 
+    // Force 3 columns on very narrow screens if 4 makes them too small, 
+    // but usually the AR check covers this (3/8 = 0.375, 4/6 = 0.66).
+    // Typical phones are ~0.45-0.5. 3x8 is usually best for portrait.
+
+    const targetCols = bestConfig.c;
     const rows = Math.ceil(totalCircles / targetCols);
 
-    // Mobile adjustment: Gap is proportional to size (0.2 * size) in the render loop.
-    // We need to solve for size in:
-    // WidthAvailable = size * cols + size * 0.2 * (cols - 1) + size * 0.6 (stagger offset)
-    // WidthAvailable = size * (cols + 0.2 * cols - 0.2 + 0.6)
-    // WidthAvailable = size * (1.2 * cols + 0.4)
-    // size = WidthAvailable / (1.2 * cols + 0.4)
+    // 2. Calculate Max Size
+    // We need to fit 'targetCols' horizontally and 'rows' vertically.
+    // Hex layout width approx: size * cols + gap * (cols-1) + stagger/2
+    // Let's assume tight packing:
+    // W = cols * size
+    // H = rows * size * 0.85 (vertical overlap)
 
-    const padding = 20;
-    const safetyBuffer = 10;
-    const availableWidth = windowSize.width - (padding * 2) - safetyBuffer;
+    const availableW = windowSize.width - (padding * 2);
+    const availableH = windowSize.height - (padding * 2);
 
-    const widthConstraint = availableWidth / (1.2 * targetCols + 0.4);
+    // Size constrained by width
+    // We want some small horizontal gap for breathing room, say 5% of size? 
+    // Or actually, user said "No empty space".
+    // Let's solve for size assuming we touch edges.
+    // W = size * targetCols * 1.05 (small gap factor)
+    const sizeByW = availableW / (targetCols * 1.05 + 0.5); // +0.5 for stagger offset
 
-    // Calculate max size by height
-    // Considering hexagonal packing overlap (approx 0.85 height per row factor + offset)
-    const heightFactor = 0.85;
-    const availableHeight = windowSize.height - (padding * 2) - safetyBuffer;
-    // Height needed = size + (rows - 1) * size * heightFactor
-    // availableHeight = size * (1 + (rows - 1) * heightFactor)
-    // size = availableHeight / (1 + (rows - 1) * heightFactor)
-    const heightConstraint = availableHeight / (1 + (rows - 1) * heightFactor);
+    // Size constrained by height
+    // H = size * (1 + (rows - 1) * 0.85)
+    // We want to FILL height.
+    const heightFactor = 0.82; // Slightly tighter overlap
+    const sizeByH = availableH / (1 + (rows - 1) * heightFactor);
 
-    let size = Math.min(widthConstraint, heightConstraint);
+    // Use the limiting dimension
+    let size = Math.min(sizeByW, sizeByH);
 
-    // Clamp size - allow much smaller circles on mobile to fit everything
-    // Increased max size to 180 to allow tablets/iPads to fill the screen (minimize empty space)
-    size = Math.min(Math.max(size, 20), 180);
+    // Clamp size logic re-introduced to safe-guard bounds
+    size = Math.min(Math.max(size, 30), 300);
 
-    return { cols: targetCols, circleSize: size };
+    // 3. Dynamic Spacing to fill remaining space
+    // If we limited by width, we might have extra height, and vice versa.
+    // actually, we want to STRETCH to fill.
+    // But we can't stretch the circle itself (it must remain circular).
+    // We must increase the gaps.
+
+    // Re-calculate gaps based on the chosen 'size'.
+
+    // Height coverage:
+    // UsedHeight = size * (1 + (rows - 1) * heightFactor)
+    // If UsedHeight < availableH, we can increase heightFactor (less overlap/more gap).
+    // desiredTotalHeight = availableH
+    // size + (rows - 1) * effectiveStepY = availableH
+    // effectiveStepY = (availableH - size) / (rows - 1)
+    // vertical overlap offset = effectiveStepY - size
+
+    let effectiveStepY = (availableH - size) / Math.max(1, rows - 1);
+    // Ensure we don't overlap TOO much (min step) or separate too much
+    // effectiveStepY should be ~ size * 0.8 to size * 1.1
+
+    // Clamp vertical gap to ensure density
+    // If effectiveStepY is huge, it means we have fewer rows than needed to fill height densely -> should have picked diff config?
+    // But we picked best config. Just center or allow gap.
+    // User said "No empty space".
+
+    // Refinement: If sizeByW << sizeByH (screen is very tall relative to width),
+    // we are width-limited. The circles are small. Current config (e.g. 3x8) leaves vertical space?
+    // If 3x8 leaves vertical space, we should increase size? We can't, width is maxed.
+    // So we must increase vertical spacing.
+
+    let verticalShift = effectiveStepY - size; // This will be negative for overlap
+
+    // Recalculate horizontal distribution
+    // Width = size * cols + (cols-1)*gapX + stagger
+    // availableW - stagger*size = size*cols + (cols-1)*gapX
+    // gapX = (availableW - (size * (cols + 0.5))) / (cols - 1)
+
+    let gapX = (availableW - (size * (targetCols + 0.5))) / Math.max(1, targetCols - 1);
+    gapX = Math.max(0, gapX); // Never negative
+
+    return {
+      cols: targetCols,
+      circleSize: size,
+      verticalGap: verticalShift,
+      horizontalGap: gapX,
+      wrapperPadding: padding
+    };
+
   }, [windowSize.width, windowSize.height]);
 
   // Pre-calculate oscillation animations to ensure stability
@@ -182,10 +261,11 @@ const CircleGrid = () => {
             style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${cols}, ${circleSize}px)`,
-              gap: `${circleSize * 0.2}px`,
-              padding: '20px',
+              gap: `${horizontalGap}px`,
+              padding: `${wrapperPadding}px`,
               width: '100%',
               justifyContent: 'center',
+              alignContent: 'center', // Center vertically if logic leaves small gaps
               // Visual centering helper if content is smaller
               margin: 'auto',
             }}
@@ -222,9 +302,9 @@ const CircleGrid = () => {
                     }
                   }}
                   style={{
-                    marginLeft: isOddRow ? `${circleSize * 0.6}px` : '0',
-                    marginRight: isOddRow ? `-${circleSize * 0.6}px` : '0',
-                    marginBottom: `-${circleSize * 0.25}px`,
+                    marginLeft: isOddRow ? `${circleSize * 0.5}px` : '0', // Standard 50% shift for hex
+                    marginRight: isOddRow ? `-${circleSize * 0.5}px` : '0',
+                    marginBottom: `${verticalGap}px`, // Dynamic vertical overlap/gap
                     zIndex: navCircleIds.includes(circle.id) ? 20 : 10,
                     position: 'relative',
                   }}
