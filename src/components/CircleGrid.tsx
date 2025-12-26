@@ -26,24 +26,63 @@ const CircleGrid = () => {
   }, []);
 
   const { cols, circleSize } = useMemo(() => {
-    // We want a fixed layout look, not filling the whole screen width blindly.
-    // Target roughly 5-6 columns on desktop.
-    let targetCols = 6;
-    if (windowSize.width < 1024) targetCols = 5;
-    if (windowSize.width < 768) targetCols = 4;
-    if (windowSize.width < 640) targetCols = 3;
-    if (windowSize.width < 480) targetCols = 2;
+    const totalCircles = 24; // Hardcoded count from circleData
 
-    // Calculate circle size to fit within the viewport comfortably
-    const gap = 15;
-    const availableWidth = Math.min(windowSize.width, 1400) - 40; // max width constrained, minus padding
-    let size = (availableWidth / targetCols) - gap;
+    // Desktop: Keep original fixed layout logic
+    if (windowSize.width >= 1024) {
+      const targetCols = 6;
+      const gap = 15;
+      const availableWidth = Math.min(windowSize.width, 1400) - 40;
+      let size = (availableWidth / targetCols) - gap;
+      size = Math.min(Math.max(size, 90), 140);
+      return { cols: targetCols, circleSize: size };
+    }
 
-    // Clamp size
-    size = Math.min(Math.max(size, 90), 140);
+    // Mobile/Tablet: Dynamic packing to fit ALL circles in viewport
+    const aspectRatio = windowSize.width / windowSize.height;
+
+    // Estimate best column count based on aspect ratio
+    // Formula attempts to make a grid with similar aspect ratio to screen
+    let targetCols = Math.round(Math.sqrt(totalCircles * aspectRatio));
+
+    // Clamp columns to reasonable bounds for mobile
+    if (windowSize.width < 480) {
+      // Force fewer columns on very narrow screens unless landscape
+      targetCols = Math.max(2, Math.min(targetCols, 4));
+    } else {
+      targetCols = Math.max(3, Math.min(targetCols, 7));
+    }
+
+    const rows = Math.ceil(totalCircles / targetCols);
+
+    // Mobile adjustment: Gap is proportional to size (0.2 * size) in the render loop.
+    // We need to solve for size in:
+    // WidthAvailable = size * cols + size * 0.2 * (cols - 1) + size * 0.6 (stagger offset)
+    // WidthAvailable = size * (cols + 0.2 * cols - 0.2 + 0.6)
+    // WidthAvailable = size * (1.2 * cols + 0.4)
+    // size = WidthAvailable / (1.2 * cols + 0.4)
+
+    const padding = 20;
+    const availableWidth = windowSize.width - (padding * 2);
+
+    const widthConstraint = availableWidth / (1.2 * targetCols + 0.4);
+
+    // Calculate max size by height
+    // Considering hexagonal packing overlap (approx 0.85 height per row factor + offset)
+    const heightFactor = 0.85;
+    const availableHeight = windowSize.height - (padding * 2);
+    // Height needed = size + (rows - 1) * size * heightFactor
+    // availableHeight = size * (1 + (rows - 1) * heightFactor)
+    // size = availableHeight / (1 + (rows - 1) * heightFactor)
+    const heightConstraint = availableHeight / (1 + (rows - 1) * heightFactor);
+
+    let size = Math.min(widthConstraint, heightConstraint);
+
+    // Clamp size - allow much smaller circles on mobile to fit everything
+    size = Math.min(Math.max(size, 30), 120);
 
     return { cols: targetCols, circleSize: size };
-  }, [windowSize.width]);
+  }, [windowSize.width, windowSize.height]);
 
   const activeCircle = useMemo(() =>
     expandedId ? circleData.find(c => c.id === expandedId) : null,
