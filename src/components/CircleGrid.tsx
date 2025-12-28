@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { circleData } from "@/data/circleData";
 import InteractiveCircle from "./InteractiveCircle";
 import CirclePopup from "./CirclePopup";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const CircleGrid = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const isMobile = useIsMobile();
 
   // Navbar circle IDs
   // Priority Order for Top Row
@@ -42,8 +44,8 @@ const CircleGrid = () => {
     if (!isAnimating) {
       setIsAnimating(true);
       setExpandedId(circleId);
-      // Reset animation state after a short delay
-      setTimeout(() => setIsAnimating(false), 300);
+      // Mobile has faster animations, so shorter delay
+      setTimeout(() => setIsAnimating(false), isMobile ? 250 : 300);
     }
   };
 
@@ -51,8 +53,8 @@ const CircleGrid = () => {
     if (!isAnimating) {
       setIsAnimating(true);
       setExpandedId(null);
-      // Reset animation state after animation completes
-      setTimeout(() => setIsAnimating(false), 400);
+      // Mobile animations complete faster
+      setTimeout(() => setIsAnimating(false), isMobile ? 350 : 400);
     }
   };
 

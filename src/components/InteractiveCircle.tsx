@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo } from "react";
 import { CircleData } from "@/data/circleData";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 interface InteractiveCircleProps {
@@ -30,6 +31,7 @@ const InteractiveCircle = ({
   size,
 }: InteractiveCircleProps) => {
   const Icon = circle.icon;
+  const isMobile = useIsMobile();
 
   // Deterministic randomize oscillation based on circle.id
   const oscillationParams = useMemo(() => {
@@ -72,14 +74,15 @@ const InteractiveCircle = ({
         style={{
           width: `${size}px`,
           height: `${size}px`,
-          willChange: 'transform'
+          willChange: 'transform',
+          WebkitTransform: 'translate3d(0, 0, 0)'
         }}
-        whileHover={{
+        whileHover={isMobile ? {} : {
           scale: 1.05,
           transition: { duration: 0.15, ease: "easeOut" }
         }}
         whileTap={{
-          scale: 0.95,
+          scale: isMobile ? 0.98 : 0.95,
           transition: { duration: 0.1, ease: "easeOut" }
         }}
       >
