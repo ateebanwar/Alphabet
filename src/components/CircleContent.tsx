@@ -10,18 +10,26 @@ const CircleContent = ({ circle }: CircleContentProps) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.3,
+        ease: [0.4, 0.0, 0.2, 1]
+      }}
       className="relative w-full flex flex-col items-center justify-start p-6 md:p-12 pb-20"
+      style={{ willChange: 'opacity, transform' }}
     >
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.4 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          delay: 0.1,
+          duration: 0.25,
+          ease: [0.4, 0.0, 0.2, 1]
+        }}
         className="text-center mt-12 md:mt-8 mb-6"
+        style={{ willChange: 'opacity, transform' }}
       >
         <div className="neu-circle w-16 h-16 md:w-20 md:h-20 flex items-center justify-center mx-auto mb-4">
           <Icon className="w-8 h-8 md:w-10 md:h-10 text-primary" />
@@ -37,20 +45,30 @@ const CircleContent = ({ circle }: CircleContentProps) => {
       {/* Content Grid */}
       {circle.content.items && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.4 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            delay: 0.2,
+            duration: 0.3,
+            ease: [0.4, 0.0, 0.2, 1]
+          }}
           className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 w-full max-w-lg"
+          style={{ willChange: 'opacity, transform' }}
         >
           {circle.content.items.map((item, index) => {
             const ItemIcon = item.icon;
             return (
               <motion.div
                 key={item.label}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 + index * 0.08, duration: 0.3 }}
+                transition={{
+                  delay: 0.25 + index * 0.05,
+                  duration: 0.2,
+                  ease: [0.4, 0.0, 0.2, 1]
+                }}
                 className="neu-tile flex items-start gap-3 p-4"
+                style={{ willChange: 'opacity, transform' }}
               >
                 {ItemIcon && (
                   <div className="neu-circle-pressed w-10 h-10 flex items-center justify-center shrink-0">

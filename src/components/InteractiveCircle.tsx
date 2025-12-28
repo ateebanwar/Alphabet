@@ -67,9 +67,21 @@ const InteractiveCircle = ({
         className={`
           neu-circle flex items-center justify-center
           cursor-pointer
-          transition-all duration-500
+          transition-transform duration-200 ease-out
         `}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          willChange: 'transform'
+        }}
+        whileHover={{
+          scale: 1.05,
+          transition: { duration: 0.15, ease: "easeOut" }
+        }}
+        whileTap={{
+          scale: 0.95,
+          transition: { duration: 0.1, ease: "easeOut" }
+        }}
       >
         <div className="flex flex-col items-center justify-center gap-2 p-4 text-center">
           <Icon className={`w-6 h-6 md:w-8 md:h-8 ${colorClasses[circle.color]}`} />

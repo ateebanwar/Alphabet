@@ -163,7 +163,7 @@
   }
 
   .neu-tile {
-    @apply rounded-xl p-3 transition-all duration-300;
+    @apply rounded-xl p-3 transition-all duration-200;
     background: hsl(var(--card));
     box-shadow:
       -4px -4px 10px hsl(var(--neu-light) / 0.6),

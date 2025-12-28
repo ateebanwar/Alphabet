@@ -6,6 +6,7 @@ import CirclePopup from "./CirclePopup";
 
 const CircleGrid = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Navbar circle IDs
   // Priority Order for Top Row
@@ -36,6 +37,24 @@ const CircleGrid = () => {
 
   // Navbar circle IDs
   const navCircleIds = ["about", "web-dev", "process", "contact"];
+
+  const handleExpand = (circleId: string) => {
+    if (!isAnimating) {
+      setIsAnimating(true);
+      setExpandedId(circleId);
+      // Reset animation state after a short delay
+      setTimeout(() => setIsAnimating(false), 300);
+    }
+  };
+
+  const handleClose = () => {
+    if (!isAnimating) {
+      setIsAnimating(true);
+      setExpandedId(null);
+      // Reset animation state after animation completes
+      setTimeout(() => setIsAnimating(false), 400);
+    }
+  };
 
   // Responsive Grid Layout
   // Responsive Grid Layout
@@ -248,8 +267,8 @@ const CircleGrid = () => {
                   <InteractiveCircle
                     circle={circle}
                     isExpanded={expandedId === circle.id}
-                    onExpand={() => setExpandedId(circle.id)}
-                    onCollapse={() => setExpandedId(null)}
+                    onExpand={() => handleExpand(circle.id)}
+                    onCollapse={handleClose}
                     size={circleSize}
                   />
                 </motion.div>
@@ -265,7 +284,7 @@ const CircleGrid = () => {
           activeCircle && (
             <CirclePopup
               circle={activeCircle}
-              onClose={() => setExpandedId(null)}
+              onClose={handleClose}
             />
           )
         }
