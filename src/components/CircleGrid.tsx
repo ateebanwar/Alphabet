@@ -8,6 +8,33 @@ const CircleGrid = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Navbar circle IDs
+  // Priority Order for Top Row
+  const sortedCircleData = useMemo(() => {
+    const priorityLabels = [
+      "About Us",
+      "Contact",
+      "Location",
+      "Consulting",
+      "Experience",
+      "Our Process"
+    ];
+
+    return [...circleData].sort((a, b) => {
+      const indexA = priorityLabels.indexOf(a.label);
+      const indexB = priorityLabels.indexOf(b.label);
+
+      // If both are priority, sort by priority index
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      // If only A is priority, it comes first
+      if (indexA !== -1) return -1;
+      // If only B is priority, it comes first
+      if (indexB !== -1) return 1;
+      // Otherwise keep original order
+      return 0;
+    });
+  }, []);
+
+  // Navbar circle IDs
   const navCircleIds = ["about", "web-dev", "process", "contact"];
 
   // Responsive Grid Layout
@@ -29,11 +56,11 @@ const CircleGrid = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { cols, circleSize, verticalGap, horizontalGap, wrapperPadding } = useMemo(() => {
-    const totalCircles = 24;
+  const { cols, circleSize, verticalGap, horizontalGap, wrapperPadding, isStaggered } = useMemo(() => {
+    const totalCircles = sortedCircleData.length;
 
-    // --- Desktop Layout (Fixed constraints) ---
-    if (windowSize.width >= 1024) {
+    // --- Desktop and Tablet Layout (Fixed constraints) ---
+    if (windowSize.width >= 1024 || (windowSize.width > 768 && windowSize.width < 1024)) {
       const targetCols = 6;
       const rows = 4;
       const gap = 15;
@@ -55,136 +82,45 @@ const CircleGrid = () => {
         circleSize: size,
         verticalGap: -(size * 0.25), // Standard overlap for desktop
         horizontalGap: size * 0.2, // Standard gap
-        wrapperPadding: 20
+        wrapperPadding: 20,
+        isStaggered: true
       };
     }
 
-    // --- Mobile/Tablet Dense Layout ---
-    // Goal: Fully cover the screen with NO empty space.
+    // --- Mobile Layout (4-column grid) ---
+    if (windowSize.width <= 768) {
+      const cols = 4;
+      const rows = Math.ceil(totalCircles / cols);
+      const padding = 20;
+      const horizontalGap = 15;
+      const availableWidth = windowSize.width - padding * 2;
+      const size = (availableWidth - horizontalGap * 3) / 4;
+      const verticalGap = 15;
 
-    // 1. Determine optimal grid shape (Cols x Rows)
-    // We want the grid's aspect ratio to match the screen's AR as closely as possible.
-    // Factors of 24: 1x24, 2x12, 3x8, 4x6, 6x4...
-    const screenAR = windowSize.width / windowSize.height;
-    const padding = windowSize.width < 480 ? 5 : 10; // Minimal padding on mobile
-
-    const validConfigs = [
-      { c: 3, r: 8 },
-      { c: 4, r: 6 },
-      { c: 5, r: 5 }, // Approx for 24 (one empty or filled) - let's stick to exact factors for now or ceil
-      { c: 6, r: 4 }
-    ];
-
-    // Find config that yields the largest circles while fitting within aspect ratio
-    // Ideally, we want the one where (TotalWidth / TotalHeight) ~ ScreenAR
-    // Width ~ c, Height ~ r. So look for c/r closest to screenAR.
-    let bestConfig = validConfigs[0];
-
-    // Explicit override for standard mobile portrait width
-    if (windowSize.width < 550) {
-      bestConfig = { c: 3, r: 8 };
-    } else {
-      let minDiff = Number.MAX_VALUE;
-
-      for (const config of validConfigs) {
-        const configAR = config.c / config.r; // Rough grid AR
-        const diff = Math.abs(configAR - screenAR);
-        if (diff < minDiff) {
-          minDiff = diff;
-          bestConfig = config;
-        }
-      }
+      return {
+        cols,
+        circleSize: size,
+        verticalGap,
+        horizontalGap,
+        wrapperPadding: padding,
+        isStaggered: false
+      };
     }
 
-    // Force 3 columns on very narrow screens if 4 makes them too small, 
-    // but usually the AR check covers this (3/8 = 0.375, 4/6 = 0.66).
-    // Typical phones are ~0.45-0.5. 3x8 is usually best for portrait.
-
-    const targetCols = bestConfig.c;
-    const rows = Math.ceil(totalCircles / targetCols);
-
-    // 2. Calculate Max Size
-    // We need to fit 'targetCols' horizontally and 'rows' vertically.
-    // Hex layout width approx: size * cols + gap * (cols-1) + stagger/2
-    // Let's assume tight packing:
-    // W = cols * size
-    // H = rows * size * 0.85 (vertical overlap)
-
-    const availableW = windowSize.width - (padding * 2);
-    const availableH = windowSize.height - (padding * 2);
-
-    // Size constrained by width
-    // We want some small horizontal gap for breathing room, say 5% of size? 
-    // Or actually, user said "No empty space".
-    // Let's solve for size assuming we touch edges.
-    // W = size * targetCols * 1.05 (small gap factor)
-    const sizeByW = availableW / (targetCols * 1.05 + 0.5); // +0.5 for stagger offset
-
-    // Size constrained by height
-    // H = size * (1 + (rows - 1) * 0.85)
-    // We want to FILL height.
-    const heightFactor = 0.82; // Slightly tighter overlap
-    const sizeByH = availableH / (1 + (rows - 1) * heightFactor);
-
-    // Use the limiting dimension
-    let size = Math.min(sizeByW, sizeByH);
-
-    // Clamp size logic re-introduced to safe-guard bounds
-    size = Math.min(Math.max(size, 30), 300);
-
-    // 3. Dynamic Spacing to fill remaining space
-    // If we limited by width, we might have extra height, and vice versa.
-    // actually, we want to STRETCH to fill.
-    // But we can't stretch the circle itself (it must remain circular).
-    // We must increase the gaps.
-
-    // Re-calculate gaps based on the chosen 'size'.
-
-    // Height coverage:
-    // UsedHeight = size * (1 + (rows - 1) * heightFactor)
-    // If UsedHeight < availableH, we can increase heightFactor (less overlap/more gap).
-    // desiredTotalHeight = availableH
-    // size + (rows - 1) * effectiveStepY = availableH
-    // effectiveStepY = (availableH - size) / (rows - 1)
-    // vertical overlap offset = effectiveStepY - size
-
-    let effectiveStepY = (availableH - size) / Math.max(1, rows - 1);
-    // Ensure we don't overlap TOO much (min step) or separate too much
-    // effectiveStepY should be ~ size * 0.8 to size * 1.1
-
-    // Clamp vertical gap to ensure density
-    // If effectiveStepY is huge, it means we have fewer rows than needed to fill height densely -> should have picked diff config?
-    // But we picked best config. Just center or allow gap.
-    // User said "No empty space".
-
-    // Refinement: If sizeByW << sizeByH (screen is very tall relative to width),
-    // we are width-limited. The circles are small. Current config (e.g. 3x8) leaves vertical space?
-    // If 3x8 leaves vertical space, we should increase size? We can't, width is maxed.
-    // So we must increase vertical spacing.
-
-    let verticalShift = effectiveStepY - size; // This will be negative for overlap
-
-    // Recalculate horizontal distribution
-    // Width = size * cols + (cols-1)*gapX + stagger
-    // availableW - stagger*size = size*cols + (cols-1)*gapX
-    // gapX = (availableW - (size * (cols + 0.5))) / (cols - 1)
-
-    let gapX = (availableW - (size * (targetCols + 0.5))) / Math.max(1, targetCols - 1);
-    gapX = Math.max(0, gapX); // Never negative
-
+    // Fallback (should not reach)
     return {
-      cols: targetCols,
-      circleSize: size,
-      verticalGap: verticalShift,
-      horizontalGap: gapX,
-      wrapperPadding: padding
+      cols: 4,
+      circleSize: 80,
+      verticalGap: 15,
+      horizontalGap: 15,
+      wrapperPadding: 20,
+      isStaggered: false
     };
-
-  }, [windowSize.width, windowSize.height]);
+  }, [windowSize.width, windowSize.height, sortedCircleData]);
 
   // Pre-calculate oscillation animations to ensure stability
   const oscillations = useMemo(() => {
-    return circleData.map(() => {
+    return sortedCircleData.map(() => {
       // Randomize direction: slightly up, down, left, or right
       const isX = Math.random() > 0.5;
       const dir = Math.random() > 0.5 ? 5 : -5;
@@ -195,11 +131,11 @@ const CircleGrid = () => {
         delay: Math.random() * 2 // Random start offset
       };
     });
-  }, []);
+  }, [sortedCircleData]);
 
   const activeCircle = useMemo(() =>
-    expandedId ? circleData.find(c => c.id === expandedId) : null,
-    [expandedId]);
+    expandedId ? sortedCircleData.find(c => c.id === expandedId) : null,
+    [expandedId, sortedCircleData]);
 
   return (
     <>
@@ -253,7 +189,7 @@ const CircleGrid = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            overflow: 'hidden', // Force no scroll
+            overflow: isStaggered ? 'hidden' : 'auto', // Allow scroll on mobile grid
             height: '100%'
           }}
         >
@@ -270,9 +206,9 @@ const CircleGrid = () => {
               margin: 'auto',
             }}
           >
-            {circleData.map((circle, index) => {
+            {sortedCircleData.map((circle, index) => {
               const row = Math.floor(index / cols);
-              const isOddRow = row % 2 === 1;
+              const isOddRow = isStaggered && row % 2 === 1; // Disable stagger if not staggered
               const move = oscillations[index];
 
               return (
